@@ -240,7 +240,7 @@ export default function UploadPage() {
               </Link>
               <button
                 type="submit" disabled={uploading}
-                className="flex-1 flex items-center justify-center gap-2 bg-gold-DEFAULT bg-gold-dark disabled:opacity-50 disabled:cursor-not-allowed text-pink-50 font-bold text-sm rounded-xl py-3 transition-all shadow-lg shadow-gold-DEFAULT/20"
+                className="flex-1 flex items-center justify-center gap-2 bg-gold-DEFAULT hover:bg-gold-dark disabled:opacity-50 disabled:cursor-not-allowed text-ink-950 font-bold text-sm rounded-xl py-3 transition-all shadow-lg shadow-gold-DEFAULT/20"
               >
                 {uploading
                   ? <><Spinner /> Uploading…</>

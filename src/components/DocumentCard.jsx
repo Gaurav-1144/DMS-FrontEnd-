@@ -10,25 +10,57 @@ const BADGE = {
 }
 
 export default function DocumentCard({ doc, onDelete }) {
-  const [confirmDel, setConfirmDel] = useState(false)
-  const [deleting,   setDeleting]   = useState(false)
+  const [confirmDel,  setConfirmDel]  = useState(false)
+  const [deleting,    setDeleting]    = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const [viewing,     setViewing]     = useState(false)
+  const [actionError, setActionError] = useState('')
 
   const { label, colorKey } = fileTypeInfo(doc.fileType)
   const badge = BADGE[colorKey] ?? BADGE.gray
 
-  /* ── actions ──────────────────────────────────────────────────────────── */
-  const handleDownload = () => {
-    const a = Object.assign(document.createElement('a'), {
-      href:     documentService.downloadUrl(doc.id),
-      download: doc.originalFileName || doc.fileName,
-    })
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
+  /* ── fetch blob via Axios so the JWT header is sent ───────────────────── */
+  const fetchBlob = async (type) => {
+    const data = await documentService.fetchFile(doc.id, type)   // arraybuffer
+    return new Blob([data], { type: doc.fileType || 'application/octet-stream' })
   }
 
-  const handleView = () =>
-    window.open(documentService.viewUrl(doc.id), '_blank', 'noopener,noreferrer')
+  const handleDownload = async () => {
+    setDownloading(true)
+    setActionError('')
+    try {
+      const blob = await fetchBlob('download')
+      const url  = URL.createObjectURL(blob)
+      const a    = Object.assign(document.createElement('a'), {
+        href:     url,
+        download: doc.originalFileName || 'document',
+      })
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    } catch (err) {
+      setActionError('Download failed: ' + err.message)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  const handleView = async () => {
+    setViewing(true)
+    setActionError('')
+    try {
+      const blob = await fetchBlob('view')
+      const url  = URL.createObjectURL(blob)
+      window.open(url, '_blank', 'noopener,noreferrer')
+      // revoke after a delay to give the new tab time to load
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (err) {
+      setActionError('Could not open file: ' + err.message)
+    } finally {
+      setViewing(false)
+    }
+  }
 
   const handleDelete = async () => {
     if (!confirmDel) { setConfirmDel(true); return }
@@ -41,40 +73,62 @@ export default function DocumentCard({ doc, onDelete }) {
   return (
     <article className="group bg-ink-800 hover:bg-ink-700/60 border border-ink-700 hover:border-ink-600 rounded-2xl p-5 transition-all duration-200 animate-fade-in">
 
-      {/* ── top row ───────────────────────────────────────────────────────── */}
+      {/* top row */}
       <div className="flex items-start gap-4">
-        {/* type badge */}
         <div className={`shrink-0 w-12 h-12 rounded-xl border flex items-center justify-center font-mono font-bold text-xs tracking-wider ${badge}`}>
           {label}
         </div>
 
-        {/* meta */}
         <div className="flex-1 min-w-0">
           <h3 className="font-display font-semibold text-white text-sm leading-snug truncate" title={doc.subject}>
             {doc.subject}
           </h3>
           <p className="text-ink-500 font-mono text-xs mt-0.5 truncate" title={doc.originalFileName}>
-            {doc.originalFileName || doc.fileName}
+            {doc.originalFileName}
           </p>
-
           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5">
-            <Meta label="Doc date"  value={formatDate(doc.documentDate)} />
-            <Meta label="Uploaded"  value={formatDateTime(doc.createdAt)} />
-            <Meta label="Size"      value={formatFileSize(doc.fileSize)} />
+            <Meta label="Doc date" value={formatDate(doc.documentDate)} />
+            <Meta label="Uploaded" value={formatDateTime(doc.createdAt)} />
+            <Meta label="Size"     value={formatFileSize(doc.fileSize)} />
           </div>
         </div>
       </div>
 
-      {/* ── action bar ────────────────────────────────────────────────────── */}
+      {/* action error */}
+      {actionError && (
+        <div className="mt-3 flex items-center gap-2 bg-ruby-DEFAULT/10 border border-ruby-DEFAULT/30 rounded-lg px-3 py-2">
+          <svg className="w-3.5 h-3.5 text-ruby-light shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <p className="text-ruby-light text-xs font-mono flex-1">{actionError}</p>
+          <button onClick={() => setActionError('')} className="text-ink-500 hover:text-white transition-colors">
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* action bar */}
       <div className="flex items-center gap-1 mt-4 pt-4 border-t border-ink-700">
-        <Btn onClick={handleView}     icon="eye"      label="View"     cls="hover:text-gold-DEFAULT   hover:bg-gold-DEFAULT/10" />
-        <Btn onClick={handleDownload} icon="download" label="Download" cls="hover:text-jade-light     hover:bg-jade-DEFAULT/10" />
+        <Btn
+          onClick={handleView}
+          icon="eye" label={viewing ? 'Opening…' : 'View'}
+          loading={viewing}
+          cls="hover:text-gold-DEFAULT hover:bg-gold-DEFAULT/10"
+        />
+        <Btn
+          onClick={handleDownload}
+          icon="download" label={downloading ? 'Saving…' : 'Download'}
+          loading={downloading}
+          cls="hover:text-jade-light hover:bg-jade-DEFAULT/10"
+        />
 
         <div className="flex-1" />
 
         {confirmDel ? (
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-ruby-light">Delete this document?</span>
+            <span className="text-xs font-mono text-ruby-light">Delete?</span>
             <button onClick={() => setConfirmDel(false)}
               className="text-xs text-ink-500 hover:text-white px-2 py-1 rounded transition-colors">
               Cancel
@@ -85,14 +139,14 @@ export default function DocumentCard({ doc, onDelete }) {
             </button>
           </div>
         ) : (
-          <Btn onClick={handleDelete} icon="trash" label="Delete" cls="text-ink-500 hover:text-ruby-light hover:bg-ruby-DEFAULT/10" />
+          <Btn onClick={handleDelete} icon="trash" label="Delete"
+            cls="text-ink-500 hover:text-ruby-light hover:bg-ruby-DEFAULT/10" />
         )}
       </div>
     </article>
   )
 }
 
-/* ── tiny helpers ─────────────────────────────────────────────────────────── */
 function Meta({ label, value }) {
   return (
     <span className="flex items-center gap-1 text-xs font-mono">
@@ -108,14 +162,20 @@ const ICON_PATHS = {
   trash:    ['M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'],
 }
 
-function Btn({ onClick, icon, label, cls }) {
+function Btn({ onClick, icon, label, cls, loading = false }) {
   const paths = ICON_PATHS[icon]
   return (
-    <button onClick={onClick} title={label}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-ink-400 transition-all duration-150 ${cls}`}>
-      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        {paths.map((d, i) => <path key={i} strokeLinecap="round" strokeLinejoin="round" d={d}/>)}
-      </svg>
+    <button onClick={onClick} disabled={loading} title={label}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-ink-400 transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed ${cls}`}>
+      {loading
+        ? <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+          </svg>
+        : <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            {paths.map((d, i) => <path key={i} strokeLinecap="round" strokeLinejoin="round" d={d}/>)}
+          </svg>
+      }
       <span className="hidden sm:inline">{label}</span>
     </button>
   )

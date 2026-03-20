@@ -2,7 +2,7 @@ import axios from 'axios'
 
 const BASE = '/api/documents'
 
-const http = axios.create({ baseURL: BASE, timeout: 30_000 })
+const http = axios.create({ baseURL: BASE, timeout: 60_000 })
 
 // Attach JWT to every request
 http.interceptors.request.use((config) => {
@@ -20,12 +20,17 @@ http.interceptors.response.use(
       localStorage.removeItem('dms_user')
       window.location.href = '/login'
     }
-    const msg = err.response?.data?.message || err.response?.data?.messages?.[0] || err.message || 'An error occurred.'
+    const msg =
+      err.response?.data?.message ||
+      err.response?.data?.messages?.[0] ||
+      err.message ||
+      'An error occurred.'
     return Promise.reject(new Error(msg))
   }
 )
 
 const documentService = {
+  /** Upload a new document */
   upload(file, subject, documentDate, onProgress) {
     const form = new FormData()
     form.append('file', file)
@@ -38,7 +43,11 @@ const documentService = {
       },
     }).then(r => r.data)
   },
-  getAll()                          { return http.get('').then(r => r.data) },
+
+  /** Fetch all documents */
+  getAll() { return http.get('').then(r => r.data) },
+
+  /** Search / filter */
   search({ subject, dateFrom, dateTo } = {}) {
     const params = {}
     if (subject)  params.subject  = subject
@@ -46,10 +55,23 @@ const documentService = {
     if (dateTo)   params.dateTo   = dateTo
     return http.get('/search', { params }).then(r => r.data)
   },
-  getById(id)                       { return http.get(`/${id}`).then(r => r.data) },
-  downloadUrl: (id) => `${BASE}/${id}/download`,
-  viewUrl:     (id) => `${BASE}/${id}/view`,
-  delete(id)                        { return http.delete(`/${id}`) },
+
+  /** Get single document metadata */
+  getById(id) { return http.get(`/${id}`).then(r => r.data) },
+
+  /**
+   * Fetch binary file data with the JWT token attached.
+   * Returns an ArrayBuffer — caller wraps it in a Blob.
+   * @param {number} id
+   * @param {'download'|'view'} type
+   */
+  fetchFile(id, type = 'download') {
+    return http.get(`/${id}/${type}`, { responseType: 'arraybuffer' })
+      .then(r => r.data)
+  },
+
+  /** Delete document */
+  delete(id) { return http.delete(`/${id}`) },
 }
 
 export default documentService

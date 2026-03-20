@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    background-color: #0A0A0F;
+    color: #fff;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+
+  /* Date input calendar icon */
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.4) brightness(1.2);
+    cursor: pointer;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar          { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track    { background: #12121A; }
+  ::-webkit-scrollbar-thumb    { background: #353548; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #4A4A62; }
+
+  /* Selection */
+  ::selection { background: rgba(245,158,11,0.25); color: #fff; }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+
+  .glass {
+    background: rgba(28, 28, 40, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
